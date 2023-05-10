@@ -3,7 +3,7 @@
 
 ***    
 
-### In this project we will be builiding  a logistic regression model, do the following analysis steps:
+### In this project we will be builiding  a logistic regression model, and following these analysis instructions:
 1. State the problem and describe the data set
 2. Fit a logistic regression model with all predictors
 3. Select the best subset of variables. Perform a diagnostic on the best model.  Perform all possible inferences you can think about.
