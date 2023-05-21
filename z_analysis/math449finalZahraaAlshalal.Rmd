@@ -1,0 +1,11 @@
+---
+title: "Math449 Final Exam"
+author: "Zahraa Alshalal"
+date: "2023-05-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
