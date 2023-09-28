@@ -1,0 +1,303 @@
+---
+title: "Project"
+author: "Praxis Lewarchick"
+date: "2023-05-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(pROC)
+library(boot)
+library(parallel)
+```
+
+Problem: what are the chances of a mushroom being poisonous based off of it's color?
+
+The following report will cover our statistical analysis of a data set regarding wild mushrooms. Given a basket of assorted mushrooms, we want to know what the likelihood of choosing a poisonous mushroom based off of the color of the mushroom. The data-set contained 24 distinct categories. We will only be focusing on two: the color of the mushroom, and whether or not it is poisonous.
+
+The kind of model we will be using is a logistic model. We chose this model due to the binary nature of the dependent variable, in this case whether or not the mushroom is poisonous. 
+
+Note: cap color is represented by the following  
+brown=n,  
+buff=b,  
+cinnamon=c,  
+gray=g,  
+green=r,  
+pink=p,  
+purple=u,  
+red=e,  
+white=w,  
+
+- - -
+
+```{r}
+
+# read the CSV file
+df <- read_csv("mushrooms.csv")
+
+# assuming the class column is encoded as 'p' for poisonous and 'e' for edible
+# recode class column to binary (0/1)
+df <- df %>%
+  mutate(class = ifelse(class == 'p', 1, 0))
+
+# fit a logistic regression model
+model <- glm(class ~ cap_color, data = df, family = binomial)
+
+# print model summary
+summary(model)
+
+# get the probabilities of a mushroom being poisonous given the cap color
+df$predicted_probability <- predict(model, type = "response")
+```
+
+
+Looking at the coefficients of the model, we can see that the estimate for the intercept is the log odds of a mushroom being poisonous when all predictors are zero (in this case, when cap_color is 'b' as it's the baseline). The other coefficients represent the change in the log odds of a mushroom being poisonous for a one-unit change in the predictor (in this case, changing the cap_color from 'b' to another color).
+
+The cap color of 'c' (cinnamon), 'e' (red), 'g' (gray), 'n' (brown), 'w' (white), and 'y' (yellow) all significantly affect the likelihood of a mushroom being poisonous, as the p-values for these colors are less than 0.05.
+
+The cap color of 'p' (pink), 'r' (green), and 'u' (purple) do not significantly affect the likelihood of a mushroom being poisonous, as their p-values are greater than 0.05. For 'r' and 'u', the estimates are extremely large and negative, but the standard errors are also extremely large, leading to a small z value and a large p-value, which indicates a lot of uncertainty about these estimates.
+
+The coefficients for 'c', 'g', 'n', and 'w' are negative, indicating that these colors are associated with a lower likelihood of the mushroom being poisonous compared to the baseline 'b' (buff) color. The coefficient for 'e' and 'y' are also negative but the effects are smaller.
+
+The 'Null deviance' and 'Residual deviance' can be used to assess the goodness of fit of the model. The null deviance represents the deviance of a model with no predictors, while the residual deviance represents the deviance of the model with predictors. A lower residual deviance compared to the null deviance suggests that the model with predictors fits the data better than the model with no predictors. However, the difference is not very large in this case, suggesting that while cap color provides some information about whether a mushroom is poisonous, it may not be a very strong predictor.
+
+Comparing these two values can tell you whether our predictors are improving the model. In this case, the null deviance is 11251.76 and the residual deviance is 10845.76. The fact that the residual deviance is lower than the null deviance indicates that the model with cap color as a predictor is performing better than a model with no predictors at all.
+
+### Second Model
+
+Now lets make a model using more predictors. For this example, let's use 'cap_color', 'cap_shape', and 'odor'. We can then use this model to make predictions.
+
+```{r}
+# fit a logistic regression model with more predictors
+model2 <- glm(class ~ cap_color + cap_shape + odor, data = df, family = binomial)
+
+# print model summary
+summary(model2)
+
+# calculate and print AIC
+cat("AIC: ", AIC(model2), "\n")
+
+# make predictions with the new model
+df$predicted_probability2 <- predict(model2, type = "response")
+```
+
+The null deviance is 11251.8 on 8123 degrees of freedom and the residual deviance is 464.8 on 8101 degrees of freedom. The large decrease in deviance from the null model to the model with predictors suggests that the predictors are improving the model significantly.
+
+The model AIC is 510.8. Compared to the previous model with an AIC of 10865.76, this new model has a substantially lower AIC, indicating that it provides a better fit to the data when taking into account the number of predictors used.
+
+The coefficients provide the log-odds of the mushroom being poisonous for each level of the predictors, compared to a reference level (the one not shown in the output), controlling for the other predictors. For example, a mushroom with cap_color 'n' (brown) is e^-3.576 = 0.028 times as likely to be poisonous compared to the reference color, controlling for cap_shape and odor.
+
+We can also see that the predictors 'cap_colorn' (brown cap color), 'cap_shapef', 'cap_shapek', and 'cap_shapex' are highly statistically significant at the alpha = 0.001 level.
+
+It's important to note that the estimates for some coefficients are very large, such as for 'odorl', 'odorc', 'odorf' etc. Also, the corresponding p-values are large indicating these predictors are not statistically significant.
+
+### confusion table.
+
+```{r}
+# Predict probabilities
+df$predicted_probability2 <- predict(model2, type = "response")
+
+# Set cutoff
+cutoff <- 0.1
+
+# Classify observations
+df$predicted_class2 <- ifelse(df$predicted_probability2 > cutoff, "p", "e")
+
+# Create confusion matrix
+table(df$class, df$predicted_class2)
+```
+
+Due to the nature of our null hypothesis, I think it is important to be conservative when choosing the set cutoff. I went with 0.1 since the cost of incorrectly classifying a poisonous mushroom as edible is very high. This way, we can ensure that we classify as few poisonous mushrooms as possible as edible.
+
+Lets go through the table.  
+The rows represent the actual classes of the mushrooms: '0' for edible (e) and '1' for poisonous (p).
+
+True Negatives (TN): The top left entry (4092) is the number of mushrooms that were correctly classified as edible.  
+False Positives (FP): The top right entry (116) is the number of mushrooms that were incorrectly classified as poisonous (they are actually edible).  
+False Negatives (FN): The bottom left entry (32) is the number of mushrooms that were incorrectly classified as edible (they are actually poisonous).  
+True Positives (TP): The bottom right entry (3884) is the number of mushrooms correctly classified as poisonous.  
+
+The sensitivity is TP / (TP + FN) = 3884 / (3884 + 32) = 0.9918, or about 99.18%.
+
+The specificity  is TN / (TN + FP) = 4092 / (4092 + 116) = 0.9724, or about 97.24%.
+
+Our precision is TP / (TP + FP) = 3884 / (3884 + 116) = 0.9711, or about 97.11%.
+
+The overall accuracy is (TP + TN) / (TP + TN + FP + FN) = (3884 + 4092) / (3884 + 4092 + 116 + 32) = 0.9818, or about 98.18%.
+
+Now we'll create another confusion table using a different cutoff.
+
+```{r}
+# Predict probabilities
+df$predicted_probability2 <- predict(model2, type = "response")
+
+# Set cutoff
+cutoff <- 0.3
+
+# Classify observations
+df$predicted_class2 <- ifelse(df$predicted_probability2 > cutoff, "p", "e")
+
+# Create confusion matrix
+table(df$class, df$predicted_class2)
+```
+
+From this table, we can conclude the following:
+
+Sensitivity: TP / (TP + FN) = 3870 / (3870 + 46) = 0.9882, or about 98.82%.
+
+Specificity: TN / (TN + FP) = 4172 / (4172 + 36) = 0.9915, or about 99.15%.
+
+Precision: TP / (TP + FP) = 3870 / (3870 + 36) = 0.9908, or about 99.08%.
+
+Accuracy: (TP + TN) / (TP + TN + FP + FN) = (3870 + 4172) / (3870 + 4172 + 36 + 46) = 0.9899, or about 98.99%.
+
+With the new cutoff, we see that the precision and specificity have increased compared to the model with the cutoff of 0.1. However, the sensitivity slightly decreased. This suggests that by increasing the cutoff, the model has become more cautious about classifying a mushroom as poisonous, which results in fewer edible mushrooms being incorrectly classified as poisonous, but also more poisonous mushrooms being incorrectly classified as edible.
+
+### ROC and AOC test
+
+```{r}
+# Make prediction on the dataset
+pred <- predict(model, newdata = df, type = "response")
+
+# Create the ROC object
+roc_obj <- roc(df$class, pred)
+
+plot(roc_obj, print.thres = "best", print.thres.best.method = "closest.topleft")
+
+auc(roc_obj)
+
+coords(roc_obj, "best")
+```
+
+The Area Under the Curve (AUC) value is 0.6157. This means the model's performance, with an AUC of around 0.6157, is better than random guessing but far from perfect.
+
+The best threshold for classification, according to the closest top-left method, is approximately 0.515. This means that if the predicted probability is above this threshold, the mushroom is classified as poisonous; otherwise, it is classified as edible.
+
+At this threshold, the model achieves a specificity (true negative rate) of approximately 0.732 and a sensitivity (true positive rate) of approximately 0.448. This implies that the model correctly identifies about 73.2% of the edible mushrooms (true negatives), but only about 44.8% of the poisonous ones (true positives). These numbers suggest that the model may not be very reliable for identifying poisonous mushrooms.
+
+### LOOCV and k-fold cross-validation
+
+```{r, eval=TRUE}
+
+# Fit the model
+model <- glm(class ~ cap_color + cap_shape + odor, family = binomial, data = df)
+
+# Prepare data for parallel processing
+cores <- detectCores() # Detect the number of CPU cores available
+loocv_cl <- makeCluster(cores) # Create a cluster using the available CPU cores
+
+# Export required objects and functions to the cluster
+clusterExport(loocv_cl, c("df", "model"))
+loaded_libraries <- clusterEvalQ(loocv_cl, library(boot)) # Load the boot library in the cluster environment
+
+# Perform LOOCV
+cv.error <- parLapply(loocv_cl, 1:nrow(df), function(i) {
+  validation_df <- df[-i, ] # Remove the current validation entry/point
+  mod <- glm(class ~ cap_color + cap_shape + odor, family = binomial, data = validation_df)
+  actual <- df[i, ]$class
+  predicted <- ifelse(predict(mod, newdata = df[i, ], type = "response") > 0.5, 1, 0)
+  return((predicted - actual)^2)
+})
+
+# Calculate the mean squared error
+mse <- sum(unlist(cv.error)) / length(cv.error)
+print(mse)
+
+# Stop the cluster
+stopCluster(loocv_cl)
+
+###################################################
+
+# Fit the model
+model <- glm(class ~ cap_color + cap_shape + odor, family = binomial, data = df)
+
+# Prepare data for parallel processing
+cores <- detectCores() # Detect the number of CPU cores available
+k_fold_cl <- makeCluster(cores) # Create a cluster using the available CPU cores
+
+# Generate indices for 10-fold CV
+K <- 10
+fold_indices <- sample(rep(1:K, length.out = nrow(df)))
+
+# Export required objects and functions to the cluster
+clusterExport(k_fold_cl, c("df", "model", "fold_indices")) # Add fold_indices
+loaded_libraries <- clusterEvalQ(k_fold_cl, library(boot)) # Load the boot library in the cluster environment and save output to a variable
+
+# Perform 10-fold CV
+cv.error <- parLapply(k_fold_cl, 1:K, function(k) {
+  train_indices <- (fold_indices != k)
+  validation_indices <- (fold_indices == k)
+  train_df <- df[train_indices, ]
+  validation_df <- df[validation_indices, ]
+  mod <- glm(class ~ cap_color + cap_shape + odor, family = binomial, data = train_df)
+  actual <- validation_df$class
+  predicted <- ifelse(predict(mod, newdata = validation_df, type = "response") > 0.5, 1, 0)
+  return(sum((predicted - actual)^2))
+})
+
+# Calculate the mean squared error
+mse <- sum(unlist(cv.error)) / nrow(df)
+print(mse)
+
+# Stop the cluster
+stopCluster(k_fold_cl)
+```
+
+This took some finagling because our dataset is rather large, and running LOOCV on a single core was taking too long. The above looks confusing, but that's just because I needed to implement a parallel processing package. The code can be simplified to the following.
+
+```{r}
+## Fit the model
+#model <- glm(class ~ cap_color + cap_shape + odor, family = binomial, data = df)
+
+## Perform LOOCV
+#cv.error <- cv.glm(df, model, K = nrow(df))
+
+## Print the mean squared error
+#print(cv.error$delta[1])
+
+## Perform 10-fold CV
+#cv.error <- cv.glm(df, model, K = 10)
+
+## Print the mean squared error
+#print(cv.error$delta[1])
+```
+
+Both test result in the same Mean Square Error (MSE).
+
+A MSE of 0.0086 is very low, suggesting that the model makes very accurate predictions.
+
+### probit link
+
+```{r}
+# Fit the probit and identity link models
+probit_model <- glm(class ~ cap_color, family = binomial(link = "probit"), data = df)
+#identity_model <- glm(class ~ cap_color, family = binomial(link = "identity"), data = df, control = glm.control(maxit = 50))
+
+# Model summaries
+summary(probit_model)
+#summary(identity_model)
+```
+
+### contingency tables
+
+```{r}
+# Create a contingency table for 'class' and 'cap_color'
+contingency_table <- table(df$class, df$cap_color)
+
+# Perform the Chi-square test
+chi_square_test <- chisq.test(contingency_table)
+
+# Perform the G-test (G^2)
+g_test <- 2 * sum(contingency_table * log(contingency_table / (rowSums(contingency_table) %*% t(colSums(contingency_table))) * sum(contingency_table)))
+g_test
+
+g_test_p_value <- 1 - pchisq(g_test, df = (nrow(contingency_table) - 1) * (ncol(contingency_table) - 1))
+g_test_p_value
+
+# Calculate Cramér's V
+cramers_v <- sqrt(chi_square_test$statistic / (sum(contingency_table) * (min(nrow(contingency_table), ncol(contingency_table)) - 1)))
+cramers_v
+
+```
