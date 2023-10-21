@@ -67,5 +67,5 @@ If applicable, we will apply methods for contingency tables to analyze grouped d
 
 ## Report
 
-A detailed report summarizing the analysis, findings, and insights will be generated based on the project's results.
+
 
