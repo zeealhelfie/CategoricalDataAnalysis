@@ -25,18 +25,17 @@ The dataset contains information about 8,124 mushrooms with 23 different attribu
 
 ## Logistic Regression Model
 
-We start by fitting a logistic regression model using all available predictors.
+A logistic regression model was fitted to the training data using all available features. The model yielded an accuracy of 96.35% on the test data and 96.96% on the train data. The area under the ROC curve (AUC) for the logistic regression model was 0.9408 on the test set.
 
 ## Feature Selection and Model Diagnostics
 
-- We will perform feature selection to identify the best subset of variables.
-- A diagnostic on the best model will be conducted to assess its performance.
-- We will perform various statistical inferences on the model's coefficients and parameters.
+Predictor variables in the model exhibit high multicollinearity. Specifically, the variables "Gill spacing," "Gill size," "Stalk root," "Stalk surface above the ring," and "Ring type" have VIF values greater than 5, indicating a strong correlation among these variables. This high multicollinearity can affect the model's interpretability.   
 
 ## Predictions and Confusion Tables
 
-- Using the selected model, we will make predictions.
-- We will vary the pi_0 values as cut-off points to create confusion tables for classification.
+- Using the selected model, we made predictions. The accuracy of 95.69% for the test data and 96.03% for the training data suggest that the model is able to accurately predict the class labels for the mushrooms based on the selected features in the new model. Similar to the previous model.
+- These confusion matrices provide a detailed breakdown of the model's performance at different cutoff values, allowing you to analyze the trade-off between true positives and true negatives based on your specific requirements. At pi_0 = 0.5, the confusion matrix shows a balanced classification result, with a relatively equal number of edible and poisonous mushrooms correctly classified.
+-  Among these cutoff values, the best cutoff value was found to be 0.5, which achieved an accuracy of 95.69%. This means that when using 0.5 as the cutoff point, the model correctly classified 95.69% of the mushrooms as edible or poisonous.
 
 ## Data Visualization
 
